@@ -1,26 +1,55 @@
 import logging
 from typing import Optional, List, Tuple
+import sys
+import traceback
 
+print(f"Python version: {sys.version}")
+print(f"Python executable: {sys.executable}")
+
+PYCAW_AVAILABLE = False
 try:
+    print("Trying to import from pycaw.pycaw...")
     from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume, IAudioEndpointVolume
+    print("Trying to import from pycaw.constants...")
     from pycaw.constants import CLSCTX_ALL
+    print("Trying to import from ctypes...")
     from ctypes import cast, POINTER
+    print("Trying to import from comtypes...")
     from comtypes import COMError
+    print("All imports successful!")
     PYCAW_AVAILABLE = True
-except ImportError:
-    print("Audio Control features require 'pycaw'. Please install it: pip install pycaw")
+except ImportError as e:
+    error_info = traceback.format_exc()
+    print(f"Audio Control features require 'pycaw'. Import error: {e}")
+    print(f"Traceback: {error_info}")
     AudioUtilities = None
     ISimpleAudioVolume = None
     IAudioEndpointVolume = None 
     COMError = None
     CLSCTX_ALL = None
-    PYCAW_AVAILABLE = False
+except Exception as e:
+    error_info = traceback.format_exc()
+    print(f"Unexpected error importing pycaw: {e}")
+    print(f"Traceback: {error_info}")
+    AudioUtilities = None
+    ISimpleAudioVolume = None
+    IAudioEndpointVolume = None 
+    COMError = None
+    CLSCTX_ALL = None
+
+# Try a simpler import just to check
+try:
+    import pycaw
+    print(f"Basic pycaw import works. Version: {pycaw.__version__ if hasattr(pycaw, '__version__') else 'unknown'}")
+    print(f"pycaw path: {pycaw.__file__}")
+except ImportError as e:
+    print(f"Even basic pycaw import fails: {e}")
 
 logger = logging.getLogger(__name__)
 
 # Helper to ensure dependencies are checked before use
 def _check_dependencies():
-    if not PYCAW_AVAILABLE:
+    if not all([AudioUtilities, ISimpleAudioVolume, IAudioEndpointVolume, COMError, CLSCTX_ALL]):
         # This ensures functions raise an error early if pycaw is missing
         raise ImportError("pycaw library is not installed or failed to import.")
 
@@ -32,12 +61,8 @@ def get_master_volume() -> Optional[float]:
     Returns:
         Optional[float]: The volume level (0.0-1.0) or None on error.
     """
-    if not PYCAW_AVAILABLE:
-        logger.warning("pycaw not available, returning mock volume value")
-        return 0.5  # Return a mock value when pycaw is not available
-        
+    _check_dependencies()
     try:
-        _check_dependencies()
         devices = AudioUtilities.GetSpeakers() # Get default audio endpoint
         interface = devices.Activate(
             IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
@@ -62,16 +87,12 @@ def set_master_volume(level: float) -> bool:
     Returns:
         bool: True if successful, False otherwise.
     """
-    if not PYCAW_AVAILABLE:
-        logger.warning(f"pycaw not available, pretending to set volume to {level}")
-        return True  # Pretend it worked when pycaw is not available
-        
+    _check_dependencies()
     if not 0.0 <= level <= 1.0:
         logger.error(f"Invalid volume level: {level}. Must be between 0.0 and 1.0.")
         return False
         
     try:
-        _check_dependencies()
         devices = AudioUtilities.GetSpeakers()
         interface = devices.Activate(
             IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
@@ -90,12 +111,8 @@ def set_master_volume(level: float) -> bool:
 
 def get_master_mute_status() -> Optional[bool]:
      """Gets the current master mute status."""
-     if not PYCAW_AVAILABLE:
-         logger.warning("pycaw not available, returning mock mute status")
-         return False  # Return a mock value when pycaw is not available
-         
+     _check_dependencies()
      try:
-         _check_dependencies()
          devices = AudioUtilities.GetSpeakers()
          interface = devices.Activate(
              IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
@@ -119,12 +136,8 @@ def set_master_mute(mute: bool) -> bool:
     Returns:
         bool: True if successful, False otherwise.
     """
-    if not PYCAW_AVAILABLE:
-        logger.warning(f"pycaw not available, pretending to set mute status to {mute}")
-        return True  # Pretend it worked when pycaw is not available
-        
+    _check_dependencies()
     try:
-        _check_dependencies()
         devices = AudioUtilities.GetSpeakers()
         interface = devices.Activate(
             IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
@@ -154,24 +167,9 @@ def list_audio_devices(device_type: str = 'output') -> List[Tuple[str, str]]:
                                 (Device Friendly Name, Device ID String).
                                 Returns an empty list on failure.
     """
-    if not PYCAW_AVAILABLE:
-        logger.warning("pycaw not available, returning mock device list")
-        if device_type == 'output':
-            # Return mock output devices
-            return [
-                ("Mock Speaker Device", "mock-speaker-id"),
-                ("Mock HDMI Output", "mock-hdmi-id")
-            ]
-        else:
-            # Return mock input devices
-            return [
-                ("Mock Microphone", "mock-mic-id"),
-                ("Mock Line In", "mock-line-in-id")
-            ]
-    
+    _check_dependencies()
     devices_list = []
     try:
-        _check_dependencies()
         if device_type == 'output':
             devices = AudioUtilities.GetPlaybackDevices()
         elif device_type == 'input':
@@ -231,10 +229,7 @@ def set_default_audio_device(device_id: str, device_type: str = 'output') -> boo
     Returns:
         bool: True if the attempt was made (doesn't guarantee success), False otherwise.
     """
-    if not PYCAW_AVAILABLE:
-        logger.warning(f"pycaw not available, pretending to set default {device_type} device to {device_id}")
-        return True  # Pretend it worked when pycaw is not available
-    
+    _check_dependencies()
     logger.warning("set_default_audio_device is experimental and likely non-functional.")
     
     # Example using a hypothetical external tool (like NirCmd)
@@ -253,7 +248,7 @@ def set_default_audio_device(device_id: str, device_type: str = 'output') -> boo
         
     # Placeholder return
     logger.error("Default audio device switching is not implemented via pycaw.")
-    return False
+    return False 
 
 
 # Example Usage (for testing, remove later)
