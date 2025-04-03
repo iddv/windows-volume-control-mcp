@@ -5,7 +5,7 @@ from typing import Dict, Optional, List, Tuple
 from registry_handler import list_sound_events, get_sound_file_path, set_sound_file_path
 from sound_operations import play_system_sound, play_wav_file
 from profile_manager import save_profile, load_profile, apply_profile, list_profiles, delete_profile
-from mcp_handler import MCPHandler # Keep MCP import if CLI uses it directly
+# REMOVED: from mcp_handler import MCPHandler # Keep MCP import if CLI uses it directly
 # Import new audio control functions
 from audio_control import (
     get_master_volume, set_master_volume,
@@ -89,38 +89,22 @@ class SoundManager:
     def get_volume(self) -> Optional[float]:
         """Gets the master system volume (0.0 to 1.0)."""
         logger.debug("Getting master volume.")
-        try:
-            return get_master_volume()
-        except ImportError:
-            logger.error("Cannot get volume: pycaw library not installed.")
-            return None
+        return get_master_volume()
             
     def set_volume(self, level: float) -> bool:
         """Sets the master system volume (0.0 to 1.0)."""
         logger.debug(f"Setting master volume to {level}")
-        try:
-            return set_master_volume(level)
-        except ImportError:
-            logger.error("Cannot set volume: pycaw library not installed.")
-            return False
+        return set_master_volume(level)
 
     def get_mute(self) -> Optional[bool]:
         """Gets the master system mute status."""
         logger.debug("Getting master mute status.")
-        try:
-            return get_master_mute_status()
-        except ImportError:
-            logger.error("Cannot get mute status: pycaw library not installed.")
-            return None
+        return get_master_mute_status()
             
     def set_mute(self, mute: bool) -> bool:
         """Sets the master system mute status."""
         logger.debug(f"Setting master mute to {mute}")
-        try:
-            return set_master_mute(mute)
-        except ImportError:
-            logger.error("Cannot set mute status: pycaw library not installed.")
-            return False
+        return set_master_mute(mute)
 
     def get_audio_devices(self, device_type: str = 'output') -> List[Tuple[str, str]]:
         """Lists available audio devices.
@@ -132,20 +116,12 @@ class SoundManager:
             List[Tuple[str, str]]: List of (name, id) tuples.
         """
         logger.debug(f"Listing {device_type} audio devices.")
-        try:
-            return list_audio_devices(device_type)
-        except ImportError:
-            logger.error("Cannot list audio devices: pycaw library not installed.")
-            return []
+        return list_audio_devices(device_type)
             
     def set_active_audio_device(self, device_id: str, device_type: str = 'output') -> bool:
         """Sets the default audio device (EXPERIMENTAL)."""
         logger.warning(f"Attempting to set default {device_type} device to {device_id} (unreliable operation).")
-        try:
-            return set_default_audio_device(device_id, device_type)
-        except ImportError:
-            logger.error("Cannot set default audio device: pycaw library not installed.")
-            return False
+        return set_default_audio_device(device_id, device_type)
 
 # Example Usage (for testing within this file, remove later)
 # if __name__ == '__main__':
