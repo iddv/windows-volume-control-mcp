@@ -10,12 +10,10 @@ PYCAW_AVAILABLE = False
 try:
     print("Trying to import from pycaw.pycaw...")
     from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume, IAudioEndpointVolume
-    print("Trying to import from pycaw.constants...")
-    from pycaw.constants import CLSCTX_ALL
+    print("Trying to import from comtypes directly...")
+    from comtypes import CLSCTX_ALL, COMError  # Import CLSCTX_ALL directly from comtypes
     print("Trying to import from ctypes...")
     from ctypes import cast, POINTER
-    print("Trying to import from comtypes...")
-    from comtypes import COMError
     print("All imports successful!")
     PYCAW_AVAILABLE = True
 except ImportError as e:
@@ -49,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 # Helper to ensure dependencies are checked before use
 def _check_dependencies():
-    if not all([AudioUtilities, ISimpleAudioVolume, IAudioEndpointVolume, COMError, CLSCTX_ALL]):
+    if not PYCAW_AVAILABLE:
         # This ensures functions raise an error early if pycaw is missing
         raise ImportError("pycaw library is not installed or failed to import.")
 
