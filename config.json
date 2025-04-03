@@ -1,0 +1,18 @@
+{
+    "mcp_profiles": {
+        "contexts": [
+            {
+                "type": "active_window_title",
+                "pattern": "^.*Notepad*", 
+                "profile": "Quiet Profile Example"
+            },
+            {
+                "type": "active_window_title",
+                "pattern": "^.*Visual Studio Code*",
+                "profile": "Coding Focus"
+            }
+        ],
+        "default_profile": "Windows Default - Backup",
+        "monitor_interval_seconds": 5
+    }
+} 
