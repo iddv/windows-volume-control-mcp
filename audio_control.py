@@ -165,40 +165,88 @@ def list_audio_devices(device_type: str = 'output') -> List[Tuple[str, str]]:
                                 (Device Friendly Name, Device ID String).
                                 Returns an empty list on failure.
     """
-    _check_dependencies()
+    if not PYCAW_AVAILABLE:
+        logger.warning("pycaw not available, returning mock device list")
+        if device_type == 'output':
+            # Return mock output devices
+            return [
+                ("Mock Speaker Device", "mock-speaker-id"),
+                ("Mock HDMI Output", "mock-hdmi-id")
+            ]
+        else:
+            # Return mock input devices
+            return [
+                ("Mock Microphone", "mock-mic-id"),
+                ("Mock Line In", "mock-line-in-id")
+            ]
+    
+    # Print available methods for debugging
+    print(f"AudioUtilities methods: {[method for method in dir(AudioUtilities) if not method.startswith('_')]}", file=sys.stderr)
+    
     devices_list = []
     try:
+        _check_dependencies()
+        
+        # Use the correct methods based on the available API
         if device_type == 'output':
-            devices = AudioUtilities.GetPlaybackDevices()
+            # Try different method names that might exist in the current pycaw version
+            if hasattr(AudioUtilities, 'GetAllDevices'):
+                # Filter for playback devices
+                all_devices = AudioUtilities.GetAllDevices()
+                devices = [d for d in all_devices if getattr(d, 'IsPlayback', False)]
+                print(f"Found {len(devices)} playback devices using GetAllDevices", file=sys.stderr)
+            elif hasattr(AudioUtilities, 'GetSpeakers'):
+                # GetSpeakers might return a single device or list
+                devices = [AudioUtilities.GetSpeakers()]
+                print(f"Using GetSpeakers as fallback", file=sys.stderr)
+            else:
+                logger.error("No suitable method found to list playback devices")
+                return []
         elif device_type == 'input':
-            devices = AudioUtilities.GetCaptureDevices()
+            # Similar approach for input devices
+            if hasattr(AudioUtilities, 'GetAllDevices'):
+                all_devices = AudioUtilities.GetAllDevices()
+                devices = [d for d in all_devices if getattr(d, 'IsCapture', False)]
+                print(f"Found {len(devices)} capture devices using GetAllDevices", file=sys.stderr)
+            elif hasattr(AudioUtilities, 'GetMicrophone'):
+                devices = [AudioUtilities.GetMicrophone()]
+                print(f"Using GetMicrophone as fallback", file=sys.stderr)
+            else:
+                logger.error("No suitable method found to list capture devices")
+                return []
         else:
             logger.error(f"Invalid device_type: {device_type}. Use 'output' or 'input'.")
             return []
             
-        if not devices:
+        if not devices or len(devices) == 0:
              logger.info(f"No {device_type} audio devices found.")
              return []
              
         logger.debug(f"Found {len(devices)} {device_type} devices.")
         for i, device in enumerate(devices):
             try:
-                # Sometimes accessing properties can fail
-                device_name = device.FriendlyName
-                device_id = device.id
-                # state = device.state # Can check if active, disabled, etc.
+                # Debug the device's available attributes
+                print(f"Device {i} attributes: {[attr for attr in dir(device) if not attr.startswith('_')]}", file=sys.stderr)
+                
+                # Try to access properties in a flexible way
+                device_name = getattr(device, 'FriendlyName', None) or getattr(device, 'name', f"Device {i}")
+                device_id = getattr(device, 'id', None) or str(i)
+                
                 devices_list.append((device_name, device_id))
                 logger.debug(f"  Device {i}: Name='{device_name}', ID='{device_id}'")
             except COMError as ce:
                  logger.warning(f"COMError accessing properties for device index {i}: {ce}")
             except Exception as ex:
                  logger.warning(f"Error accessing properties for device index {i}: {ex}")
+                 print(f"Error details for device {i}: {traceback.format_exc()}", file=sys.stderr)
                  
     except COMError as e:
         # Errors can occur if audio service is stopped or devices change rapidly
         logger.error(f"COMError listing {device_type} devices: {e}", exc_info=True)
+        print(f"COMError details: {traceback.format_exc()}", file=sys.stderr)
     except Exception as e:
         logger.error(f"Error listing {device_type} devices: {e}", exc_info=True)
+        print(f"Error details: {traceback.format_exc()}", file=sys.stderr)
     
     return devices_list
     
