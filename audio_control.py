@@ -187,58 +187,99 @@ def list_audio_devices(device_type: str = 'output') -> List[Tuple[str, str]]:
     try:
         _check_dependencies()
         
-        # Use the correct methods based on the available API
         if device_type == 'output':
-            # Try different method names that might exist in the current pycaw version
-            if hasattr(AudioUtilities, 'GetAllDevices'):
-                # Filter for playback devices
+            # Get the default output device (speakers)
+            try:
+                default_device = AudioUtilities.GetSpeakers()
+                if default_device:
+                    device = AudioUtilities.CreateDevice(default_device)
+                    if device:
+                        device_name = device.FriendlyName or "Default Speaker"
+                        device_id = device.id
+                        devices_list.append((device_name, device_id))
+                        logger.debug(f"Added default output device: {device_name}")
+            except Exception as e:
+                logger.warning(f"Could not retrieve default output device: {e}")
+            
+            # Try to get all devices if we want a complete list
+            try:
                 all_devices = AudioUtilities.GetAllDevices()
-                devices = [d for d in all_devices if getattr(d, 'IsPlayback', False)]
-                print(f"Found {len(devices)} playback devices using GetAllDevices", file=sys.stderr)
-            elif hasattr(AudioUtilities, 'GetSpeakers'):
-                # GetSpeakers might return a single device or list
-                devices = [AudioUtilities.GetSpeakers()]
-                print(f"Using GetSpeakers as fallback", file=sys.stderr)
-            else:
-                logger.error("No suitable method found to list playback devices")
-                return []
+                # Add non-default output devices
+                for device in all_devices:
+                    # Check if it's an output device (data flow = eRender/0)
+                    is_output = False
+                    try:
+                        if hasattr(AudioUtilities, 'GetEndpointDataFlow'):
+                            is_output = AudioUtilities.GetEndpointDataFlow(device.id, outputType=1) == 0
+                        elif hasattr(device, 'properties'):
+                            # Could check device properties, but that's device-specific
+                            # For now, assume it's an output if it's not the default one we already added
+                            device_id = device.id
+                            is_output = (device_id not in [d[1] for d in devices_list])
+                            
+                        if is_output:
+                            device_name = device.FriendlyName or f"Output Device {len(devices_list)+1}"
+                            device_id = device.id
+                            # Avoid duplicates
+                            if device_id not in [d[1] for d in devices_list]:
+                                devices_list.append((device_name, device_id))
+                                logger.debug(f"Added output device: {device_name}")
+                    except Exception as ex:
+                        logger.debug(f"Error checking if device is output: {ex}")
+                        continue
+            except Exception as e:
+                logger.warning(f"Could not retrieve all devices: {e}")
+                
         elif device_type == 'input':
-            # Similar approach for input devices
-            if hasattr(AudioUtilities, 'GetAllDevices'):
+            # Get the default input device (microphone)
+            try:
+                default_device = AudioUtilities.GetMicrophone()
+                if default_device:
+                    device = AudioUtilities.CreateDevice(default_device)
+                    if device:
+                        device_name = device.FriendlyName or "Default Microphone"
+                        device_id = device.id
+                        devices_list.append((device_name, device_id))
+                        logger.debug(f"Added default input device: {device_name}")
+            except Exception as e:
+                logger.warning(f"Could not retrieve default input device: {e}")
+                
+            # Try to get all devices if we want a complete list
+            try:
                 all_devices = AudioUtilities.GetAllDevices()
-                devices = [d for d in all_devices if getattr(d, 'IsCapture', False)]
-                print(f"Found {len(devices)} capture devices using GetAllDevices", file=sys.stderr)
-            elif hasattr(AudioUtilities, 'GetMicrophone'):
-                devices = [AudioUtilities.GetMicrophone()]
-                print(f"Using GetMicrophone as fallback", file=sys.stderr)
-            else:
-                logger.error("No suitable method found to list capture devices")
-                return []
+                # Add non-default input devices
+                for device in all_devices:
+                    # Check if it's an input device (data flow = eCapture/1)
+                    is_input = False
+                    try:
+                        if hasattr(AudioUtilities, 'GetEndpointDataFlow'):
+                            is_input = AudioUtilities.GetEndpointDataFlow(device.id, outputType=1) == 1
+                        elif hasattr(device, 'properties'):
+                            # Could check device properties, but that's device-specific
+                            # For now, assume it's an input if it's not the default one we already added
+                            device_id = device.id
+                            is_input = (device_id not in [d[1] for d in devices_list])
+                            
+                        if is_input:
+                            device_name = device.FriendlyName or f"Input Device {len(devices_list)+1}"
+                            device_id = device.id
+                            # Avoid duplicates
+                            if device_id not in [d[1] for d in devices_list]:
+                                devices_list.append((device_name, device_id))
+                                logger.debug(f"Added input device: {device_name}")
+                    except Exception as ex:
+                        logger.debug(f"Error checking if device is input: {ex}")
+                        continue
+            except Exception as e:
+                logger.warning(f"Could not retrieve all devices: {e}")
         else:
             logger.error(f"Invalid device_type: {device_type}. Use 'output' or 'input'.")
             return []
             
-        if not devices or len(devices) == 0:
+        if not devices_list:
              logger.info(f"No {device_type} audio devices found.")
-             return []
-             
-        logger.debug(f"Found {len(devices)} {device_type} devices.")
-        for i, device in enumerate(devices):
-            try:
-                # Debug the device's available attributes
-                print(f"Device {i} attributes: {[attr for attr in dir(device) if not attr.startswith('_')]}", file=sys.stderr)
-                
-                # Try to access properties in a flexible way
-                device_name = getattr(device, 'FriendlyName', None) or getattr(device, 'name', f"Device {i}")
-                device_id = getattr(device, 'id', None) or str(i)
-                
-                devices_list.append((device_name, device_id))
-                logger.debug(f"  Device {i}: Name='{device_name}', ID='{device_id}'")
-            except COMError as ce:
-                 logger.warning(f"COMError accessing properties for device index {i}: {ce}")
-            except Exception as ex:
-                 logger.warning(f"Error accessing properties for device index {i}: {ex}")
-                 print(f"Error details for device {i}: {traceback.format_exc()}", file=sys.stderr)
+        else:
+             logger.debug(f"Found {len(devices_list)} {device_type} devices.")
                  
     except COMError as e:
         # Errors can occur if audio service is stopped or devices change rapidly
